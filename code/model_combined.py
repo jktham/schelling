@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import math
 import time
 
 class Agent:
@@ -10,12 +11,19 @@ class Agent:
 		self.wealth = wealth
 
 class Cell:
-	def __init__(self, type, price):
+	def __init__(self, type, price, point_distances):
 		self.type = type
 		self.price = price
+		self.point_distances = point_distances
+
+class Point:
+	def __init__(self, type, i, j):
+		self.type = type
+		self.i = i
+		self.j = j
 
 class Model:
-	def __init__(self, size, iterations, strategy, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, cell_prices):
+	def __init__(self, size, iterations, strategy, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, cell_prices, point_count):
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
@@ -32,6 +40,9 @@ class Model:
 		self.cell_ratios = cell_ratios
 		self.cell_prices = cell_prices
 
+		self.points = np.empty(shape=(point_count), dtype=object)
+		self.point_count = point_count
+
 	def setup(self):
 		self.agents.fill(None)
 		for i in range(self.size):
@@ -40,8 +51,7 @@ class Model:
 				self.agents[i][j] = Agent(
 					type=t, 
 					threshold=self.agent_thresholds[t], 
-					wealth=self.agent_wealths[t], 
-
+					wealth=self.agent_wealths[t]
 				)
 		
 		self.cells.fill(None)
@@ -51,8 +61,19 @@ class Model:
 				self.cells[i][j] = Cell(
 					type=t, 
 					price=self.cell_prices[t], 
-
+					point_distances=np.empty(shape=(self.point_count))
 				)
+
+		self.points.fill(None)
+		for p in range(self.point_count):
+			self.points[p] = Point(
+				type=0, 
+				i=random.randint(0, self.size-1), 
+				j=random.randint(0, self.size-1)
+			)
+			for i in range(self.size):
+				for j in range(self.size):
+					self.cells[i][j].point_distances[p] = math.sqrt(abs(i - self.points[p].i)**2 + abs(j - self.points[p].j)**2)
 
 	def get_neighbors(self, i, j):
 		return [(k, q) for k in range(max(0, i-1), min(i+2, self.size)) for q in range(max(0, j-1), min(j+2, self.size)) if (k, q) != (i, j)]
@@ -83,6 +104,11 @@ class Model:
 				min_price = min(empty_cells_prices.values())
 				min_price_cells = [key for key, value in empty_cells_prices.items() if value == min_price]
 				return random.choice(min_price_cells)
+			if self.strategy == "min_dist_0":
+				empty_cells_prices = {(i, j): self.cells[i, j].point_distances[0] for i, j in empty_cells}
+				min_price = min(empty_cells_prices.values())
+				min_price_cells = [key for key, value in empty_cells_prices.items() if value == min_price]
+				return random.choice(min_price_cells)
 		return None
 
 	def move_agent(self, i, j):
@@ -107,21 +133,29 @@ class Model:
 		fig = plt.figure()
 		fig.suptitle(f'Schelling Model ({self.iteration} iterations)')
 
-		fig.add_subplot(2, 2, 1)
+		fig.add_subplot(3, 2, 1)
 		plt.imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=0, vmax=self.agent_types)
 		plt.title(f'Agent Types')
 
-		fig.add_subplot(2, 2, 2)
+		fig.add_subplot(3, 2, 2)
 		plt.imshow(np.vectorize(lambda a: a.wealth)(self.agents), cmap='cool', vmin=0, vmax=max(self.agent_wealths))
 		plt.title(f'Agent Wealth')
 
-		fig.add_subplot(2, 2, 3)
+		fig.add_subplot(3, 2, 3)
 		plt.imshow(np.vectorize(lambda c: c.type)(self.cells), cmap='cool', vmin=0, vmax=self.cell_types)
 		plt.title(f'Cell Types')
 
-		fig.add_subplot(2, 2, 4)
+		fig.add_subplot(3, 2, 4)
 		plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='cool', vmin=0, vmax=max(self.cell_prices))
 		plt.title(f'Cell Prices')
+
+		fig.add_subplot(3, 2, 5)
+		plt.imshow(np.vectorize(lambda c: c.point_distances[0])(self.cells), cmap='cool', vmin=0, vmax=70)
+		plt.title(f'Cell Distances 0')
+
+		fig.add_subplot(3, 2, 6)
+		plt.imshow(np.vectorize(lambda c: c.point_distances[1])(self.cells), cmap='cool', vmin=0, vmax=70)
+		plt.title(f'Cell Distances 1')
 
 		plt.show()
 
@@ -129,7 +163,7 @@ class Model:
 model = Model(
 	size=50, 
 	iterations=200, 
-	strategy="random", 
+	strategy="min_dist_0", 
 	agent_types=5, 
 	agent_ratios=[0.2, 0.16, 0.16, 0.16, 0.16, 0.16], 
 	agent_thresholds=[0, 0.5, 0.5, 0.5, 0.5, 0.5], 
@@ -137,7 +171,7 @@ model = Model(
 	cell_types=4, 
 	cell_ratios=[0.4, 0.3, 0.2, 0.1], 
 	cell_prices=[100, 200, 300, 400], 
-
+	point_count=2
 )
 
 model.setup()
