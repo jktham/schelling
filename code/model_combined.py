@@ -30,6 +30,8 @@ class Model:
 		self.iteration = 0
 		self.strategy = strategy
 		self.empty_ratio = empty_ratio
+		self.history_satisfaction = [0]*iterations
+		self.history_time = [0]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -116,7 +118,7 @@ class Model:
 			return False
 		satisfaction = self.get_satisfaction(i, j)
 		return satisfaction < self.agents[i, j].threshold
-	
+
 	def get_empty_location(self, i, j):
 		empty_locations = [(x, y) for x in range(self.size) for y in range(self.size) if (self.agents[x, y].type == -1)]
 		if empty_locations:
@@ -149,39 +151,56 @@ class Model:
 				if self.is_unsatisfied(i, j):
 					self.move_agent(i, j)
 
+	def get_average_satisfaction(self):
+		sat = 0
+		for i in range(self.size):
+			for j in range(self.size):
+				sat += self.get_satisfaction(i, j)
+		return sat / self.size**2
+
 	def run(self):
 		t0 = time.time()
 		for i in range(self.iterations):
+			self.history_satisfaction[i] = self.get_average_satisfaction()
+			self.history_time[i] = round(time.time()-t0, 2)
+			if i % 10 == 0: print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
 			self.iterate()
-			if self.iteration % 10 == 0: print(f'iteration: {self.iteration}/{self.iterations}, time: {round(time.time()-t0, 2)}s')
 
 	def display(self):
 		fig = plt.figure()
 		fig.suptitle(f'Schelling Model ({self.iteration} iterations)')
 
-		fig.add_subplot(3, 2, 1)
+		fig.add_subplot(4, 2, 1)
 		plt.imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
 		plt.title(f'Agent Types')
 
-		fig.add_subplot(3, 2, 2)
+		fig.add_subplot(4, 2, 2)
 		plt.imshow(np.vectorize(lambda a: a.wealth)(self.agents), cmap='cool', vmin=0, vmax=max(self.agent_wealths))
 		plt.title(f'Agent Wealth')
 
-		fig.add_subplot(3, 2, 3)
+		fig.add_subplot(4, 2, 3)
 		plt.imshow(np.vectorize(lambda c: c.type)(self.cells), cmap='cool', vmin=0, vmax=self.cell_types)
 		plt.title(f'Cell Types')
 
-		fig.add_subplot(3, 2, 4)
+		fig.add_subplot(4, 2, 4)
 		plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='cool', vmin=0, vmax=max(self.cell_prices))
 		plt.title(f'Cell Prices')
 
-		fig.add_subplot(3, 2, 5)
+		fig.add_subplot(4, 2, 5)
 		plt.imshow(np.vectorize(lambda c: c.distances[0])(self.cells), cmap='cool', vmin=0, vmax=70)
 		plt.title(f'Cell Distances 0')
 
-		fig.add_subplot(3, 2, 6)
+		fig.add_subplot(4, 2, 6)
 		plt.imshow(np.vectorize(lambda c: c.distances[1])(self.cells), cmap='cool', vmin=0, vmax=70)
 		plt.title(f'Cell Distances 1')
+
+		fig.add_subplot(4, 2, 7)
+		plt.plot(range(0, self.iterations), self.history_satisfaction)
+		plt.title(f'Average Satisfaction')
+
+		fig.add_subplot(4, 2, 8)
+		plt.plot(range(0, self.iterations), self.history_time)
+		plt.title(f'Simulation Time')
 
 		plt.show()
 
