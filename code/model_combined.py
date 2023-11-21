@@ -118,22 +118,25 @@ class Model:
 			return False
 		satisfaction = self.get_satisfaction(i, j)
 		return satisfaction < self.agents[i, j].threshold
+	
+	def get_desirability(self, cell, agent):
+		if self.strategy == "random":
+			return 1
+		
+		if self.strategy == "min_price":
+			return 1 / (cell.price + 0.01)
+		
+		if self.strategy == "min_dist":
+			weighted_dist_sum = sum([cell.distances[p] * agent.interests[p] for p in range(self.point_types)])
+			return 1 / (weighted_dist_sum + 0.01)
 
 	def get_empty_location(self, i, j):
 		empty_locations = [(x, y) for x in range(self.size) for y in range(self.size) if (self.agents[x, y].type == -1)]
 		if empty_locations:
-			if self.strategy == "random":
-				return random.choice(empty_locations)
-			
-			if self.strategy == "min_price":
-				min_price = min([self.cells[location].price for location in empty_locations])
-				min_price_locations = [location for location in empty_locations if self.cells[location].price == min_price]
-				return random.choice(min_price_locations)
-			
-			if self.strategy == "min_dist":
-				min_dist = min([sum([self.cells[location].distances[p] * self.agents[i, j].interests[p] for p in range(self.point_types)]) for location in empty_locations])
-				min_dist_locations = [location for location in empty_locations if sum([self.cells[location].distances[p] * self.agents[i, j].interests[p] for p in range(self.point_types)]) == min_dist]
-				return random.choice(min_dist_locations)
+			desirabilities = [self.get_desirability(self.cells[location], self.agents[i, j]) for location in empty_locations]
+			max_desirability = max(desirabilities)
+			max_desirable_locations = [empty_locations[index] for index, value in enumerate(desirabilities) if value == max_desirability]
+			return random.choice(max_desirable_locations)
 			
 		return None
 
@@ -155,7 +158,8 @@ class Model:
 		sat = 0
 		for i in range(self.size):
 			for j in range(self.size):
-				sat += self.get_satisfaction(i, j)
+				if self.agents[i, j].type != -1:
+					sat += self.get_satisfaction(i, j)
 		return sat / self.size**2
 
 	def run(self):
