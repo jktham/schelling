@@ -18,10 +18,10 @@ class Cell:
 		self.distances = distances
 
 class Point:
-	def __init__(self, type, i, j):
+	def __init__(self, type, x, y):
 		self.type = type
-		self.i = i
-		self.j = j
+		self.x = x
+		self.y = y
 
 class Model:
 	def __init__(self, size, iterations, strategy, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, cell_prices, point_types, agent_interests):
@@ -48,77 +48,86 @@ class Model:
 		self.points = np.empty(shape=(point_types), dtype=object)
 		self.point_types = point_types
 
+	# fill agent grid according to types and ratios
 	def generate_agents(self):
 		self.agents.fill(None)
-		for i in range(self.size):
-			for j in range(self.size):
+		for x in range(self.size):
+			for y in range(self.size):
 				if random.random() < self.empty_ratio:
-					self.agents[i, j] = Agent(
-						type=-1, 
-						threshold=0, 
-						wealth=0, 
+					self.agents[x, y] = Agent(
+						type=-1,
+						threshold=0,
+						wealth=0,
 						interests=[0]*self.point_types
 					)
 				else:
 					t = np.random.choice(range(self.agent_types), p=self.agent_ratios)
-					self.agents[i, j] = Agent(
-						type=t, 
-						threshold=self.agent_thresholds[t], 
-						wealth=self.agent_wealths[t], 
+					self.agents[x, y] = Agent(
+						type=t,
+						threshold=self.agent_thresholds[t],
+						wealth=self.agent_wealths[t],
 						interests=self.agent_interests[t]
 					)
 
+	# fill cell grid according to types and ratios
 	def generate_cells(self):
 		self.cells.fill(None)
-		for i in range(self.size):
-			for j in range(self.size):
+		for x in range(self.size):
+			for y in range(self.size):
 				t = np.random.choice(range(self.cell_types), p=self.cell_ratios)
-				self.cells[i, j] = Cell(
-					type=t, 
-					price=self.cell_prices[t], 
+				self.cells[x, y] = Cell(
+					type=t,
+					price=self.cell_prices[t],
 					distances=np.empty(shape=(self.point_types))
 				)
 
+	# add one point of interest for each type at random locations and update cell distances
 	def generate_points(self):
 		self.points.fill(None)
-		for p in range(self.point_types):
-			self.points[p] = Point(
-				type=0, 
-				i=random.randint(0, self.size-1), 
-				j=random.randint(0, self.size-1)
+		for i in range(len(self.points)):
+			self.points[i] = Point(
+				type=i,
+				x=random.randint(0, self.size-1),
+				y=random.randint(0, self.size-1)
 			)
 		self.update_distances()
 
+	# calculate distances to each point type for all cells
 	def update_distances(self):
-		for p in range(self.point_types):
-			for i in range(self.size):
-				for j in range(self.size):
-					self.cells[i, j].distances[p] = math.sqrt(abs(i - self.points[p].i)**2 + abs(j - self.points[p].j)**2)
+		for i in range(len(self.points)):
+			for x in range(self.size):
+				for y in range(self.size):
+					self.cells[x, y].distances[self.points[i].type] = math.sqrt(abs(x - self.points[i].x)**2 + abs(y - self.points[i].y)**2)
 
+	# initialize model, populate agent grid, cell grid, and add points of interest
 	def setup(self):
 		self.generate_agents()
 		self.generate_cells()
 		self.generate_points()
 
-	def get_neighbors(self, i, j):
-		return [(k, q) for k in range(max(0, i-1), min(i+2, self.size)) for q in range(max(0, j-1), min(j+2, self.size)) if (k, q) != (i, j)]
+	# get neighbors as list of coordinate tuples around (x, y)
+	def get_neighbors(self, x, y):
+		return [(i, j) for i in range(max(0, x-1), min(x+2, self.size)) for j in range(max(0, y-1), min(y+2, self.size)) if (i, j) != (x, y)]
 
-	def get_satisfaction(self, i, j):
-		neighbors = self.get_neighbors(i, j)
+	# calculate satisfaction for agent at (x, y). currently only cares about type
+	def get_satisfaction(self, x, y):
+		neighbors = self.get_neighbors(x, y)
 
 		empty_neighbors = sum([(self.agents[neighbor].type == -1) for neighbor in neighbors])
-		similar_neighbors = sum([(self.agents[neighbor].type == self.agents[i, j].type) for neighbor in neighbors])
+		similar_neighbors = sum([(self.agents[neighbor].type == self.agents[x, y].type) for neighbor in neighbors])
 
 		if empty_neighbors == len(neighbors):
 			return 0.0
 		return similar_neighbors / (len(neighbors) - empty_neighbors)
 
-	def is_unsatisfied(self, i, j):
-		if self.agents[i, j].type == -1:
+	# check if agent at (x, y) is satisfied or not
+	def is_unsatisfied(self, x, y):
+		if self.agents[x, y].type == -1:
 			return False
-		satisfaction = self.get_satisfaction(i, j)
-		return satisfaction < self.agents[i, j].threshold
+		satisfaction = self.get_satisfaction(x, y)
+		return satisfaction < self.agents[x, y].threshold
 	
+	# get desirability score of cell for given agent, depending on strategy
 	def get_desirability(self, cell, agent):
 		if self.strategy == "random":
 			return 1
@@ -127,41 +136,37 @@ class Model:
 			return 1 / (cell.price + 0.01)
 		
 		if self.strategy == "min_dist":
-			weighted_dist_sum = sum([cell.distances[p] * agent.interests[p] for p in range(self.point_types)])
+			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
 			return 1 / (weighted_dist_sum + 0.01)
 
-	def get_empty_location(self, i, j):
-		empty_locations = [(x, y) for x in range(self.size) for y in range(self.size) if (self.agents[x, y].type == -1)]
+	# get empty locations and pick a random most desirable location for agent at (x, y)
+	def get_empty_location(self, x, y):
+		empty_locations = [(i, j) for i in range(self.size) for j in range(self.size) if (self.agents[i, j].type == -1)]
 		if empty_locations:
-			desirabilities = [self.get_desirability(self.cells[location], self.agents[i, j]) for location in empty_locations]
+			desirabilities = [self.get_desirability(self.cells[location], self.agents[x, y]) for location in empty_locations]
 			max_desirability = max(desirabilities)
 			max_desirable_locations = [empty_locations[index] for index, value in enumerate(desirabilities) if value == max_desirability]
 			return random.choice(max_desirable_locations)
 			
 		return None
 
-	def move_agent(self, i, j):
-		empty_location = self.get_empty_location(i, j)
+	# move agent at (x, y) to new empty location
+	def move_agent(self, x, y):
+		empty_location = self.get_empty_location(x, y)
 		if empty_location:
 			swap = self.agents[empty_location]
-			self.agents[empty_location] = self.agents[i, j]
-			self.agents[i, j] = swap
+			self.agents[empty_location] = self.agents[x, y]
+			self.agents[x, y] = swap
 
+	# iterate model
 	def iterate(self):
 		self.iteration += 1
-		for i in range(self.size):
-			for j in range(self.size):
-				if self.is_unsatisfied(i, j):
-					self.move_agent(i, j)
+		for x in range(self.size):
+			for y in range(self.size):
+				if self.is_unsatisfied(x, y):
+					self.move_agent(x, y)
 
-	def get_average_satisfaction(self):
-		sat = 0
-		for i in range(self.size):
-			for j in range(self.size):
-				if self.agents[i, j].type != -1:
-					sat += self.get_satisfaction(i, j)
-		return sat / self.size**2
-
+	# run model for configured number of iterations
 	def run(self):
 		t0 = time.time()
 		for i in range(self.iterations):
@@ -170,6 +175,16 @@ class Model:
 			if i % 10 == 0: print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
 			self.iterate()
 
+	# get average satisfaction of all agents
+	def get_average_satisfaction(self):
+		sat = 0
+		for x in range(self.size):
+			for y in range(self.size):
+				if self.agents[x, y].type != -1:
+					sat += self.get_satisfaction(x, y)
+		return sat / self.size**2
+	
+	# display current state of model using matplotlib
 	def display(self):
 		fig = plt.figure()
 		fig.suptitle(f'Schelling Model ({self.iteration} iterations)')
@@ -208,7 +223,7 @@ class Model:
 
 		plt.show()
 
-
+# example model
 model = Model(
 	size=50,
 	iterations=300,
