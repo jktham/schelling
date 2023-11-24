@@ -24,11 +24,11 @@ class Point:
 		self.y = y
 
 class Model:
-	def __init__(self, size, iterations, strategy, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, cell_prices, point_types, agent_interests):
+	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, cell_prices, point_types, agent_interests):
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
-		self.strategy = strategy
+		self.strategy_weights = strategy_weights
 		self.empty_ratio = empty_ratio
 		self.history_satisfaction = [0]*iterations
 		self.history_time = [0]*iterations
@@ -127,17 +127,20 @@ class Model:
 		satisfaction = self.get_satisfaction(x, y)
 		return satisfaction < self.agents[x, y].threshold
 	
-	# get desirability score of cell for given agent, depending on strategy
+	# get desirability score of cell for given agent, depending on strategy weights
 	def get_desirability(self, cell, agent):
-		if self.strategy == "random":
-			return 1
+		desirability = 0
+		if self.strategy_weights["random"] > 0.0:
+			desirability += 1 * self.strategy_weights["random"]
 		
-		if self.strategy == "min_price":
-			return 1 / (cell.price + 0.01)
+		if self.strategy_weights["min_price"] > 0.0:
+			desirability += 1 / (cell.price + 0.01) * self.strategy_weights["min_price"]
 		
-		if self.strategy == "min_dist":
+		if self.strategy_weights["min_point_dist"] > 0.0:
 			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
-			return 1 / (weighted_dist_sum + 0.01)
+			desirability += 1 / (weighted_dist_sum + 0.01) * self.strategy_weights["min_point_dist"]
+
+		return desirability
 
 	# get empty locations and pick a random most desirable location for agent at (x, y)
 	def get_empty_location(self, x, y):
@@ -227,7 +230,11 @@ class Model:
 model = Model(
 	size=50,
 	iterations=300,
-	strategy="min_dist",
+	strategy_weights={
+		"random": 0.0,
+		"min_price": 0.0,
+		"min_point_dist": 1.0
+	},
 	empty_ratio=0.2,
 	agent_types=5,
 	agent_ratios=[0.2, 0.2, 0.2, 0.2, 0.2],
@@ -238,11 +245,11 @@ model = Model(
 	cell_prices=[100, 200, 300, 400],
 	point_types=2,
 	agent_interests=[
-		[1, 0],
-		[1, 0],
-		[1, 0],
-		[1, 0],
-		[0, 1]
+		[1.0, 0.0],
+		[1.0, 0.0],
+		[1.0, 0.0],
+		[1.0, 0.0],
+		[0.0, 1.0]
 	]
 )
 
