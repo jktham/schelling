@@ -131,7 +131,7 @@ class Model:
 	def get_desirability(self, cell, agent):
 		desirability = 0
 		if self.strategy_weights["random"] > 0.0:
-			desirability += 1 * self.strategy_weights["random"]
+			desirability += random.random() * self.strategy_weights["random"]
 		
 		if self.strategy_weights["min_price"] > 0.0:
 			desirability += 1 / (cell.price + 0.01) * self.strategy_weights["min_price"]
@@ -231,9 +231,9 @@ model = Model(
 	size=50,
 	iterations=300,
 	strategy_weights={
-		"random": 0.0,
+		"random": 0.2,
 		"min_price": 0.0,
-		"min_point_dist": 1.0
+		"min_point_dist": 0.8
 	},
 	empty_ratio=0.2,
 	agent_types=5,
