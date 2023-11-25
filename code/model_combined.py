@@ -94,10 +94,15 @@ class Model:
 
 	# calculate distances to each point type for all cells
 	def update_distances(self):
-		for i in range(len(self.points)):
-			for x in range(self.size):
-				for y in range(self.size):
-					self.cells[x, y].distances[self.points[i].type] = math.sqrt(abs(x - self.points[i].x)**2 + abs(y - self.points[i].y)**2)
+		distances = np.empty((self.size, self.size, len(self.points)))
+		for i, point in enumerate(self.points):
+			x_diff = np.arange(self.size)[:, None] - point.x
+			y_diff = np.arange(self.size) - point.y
+			distances[:, :, i] = np.sqrt(x_diff ** 2 + y_diff ** 2)
+
+		for x in range(self.size):
+			for y in range(self.size):
+				self.cells[x, y].distances = distances[x, y]
 
 	# initialize model, populate agent grid, cell grid, and add points of interest
 	def setup(self):
@@ -223,7 +228,7 @@ class Model:
 		fig.add_subplot(4, 2, 8)
 		plt.plot(range(0, self.iterations), self.history_time)
 		plt.title(f'Simulation Time')
-
+		plt.savefig("plot.png")
 		plt.show()
 
 # example model
