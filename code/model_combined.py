@@ -14,7 +14,7 @@ class Agent:
 class Cell:
 	def __init__(self, type, price, distances):
 		self.type = type
-		self.price = price
+		self.price = 0
 		self.distances = distances
 
 class Point:
@@ -24,7 +24,7 @@ class Point:
 		self.y = y
 
 class Model:
-	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, cell_prices, point_types, agent_interests):
+	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
@@ -43,7 +43,6 @@ class Model:
 		self.cells = np.empty(shape=(size, size), dtype=object)
 		self.cell_types = cell_types
 		self.cell_ratios = cell_ratios
-		self.cell_prices = cell_prices
 
 		self.points = np.empty(shape=(point_types), dtype=object)
 		self.point_types = point_types
@@ -65,7 +64,7 @@ class Model:
 					self.agents[x, y] = Agent(
 						type=t,
 						threshold=self.agent_thresholds[t],
-						wealth=self.agent_wealths[t],
+						wealth=self.agent_wealths[t] if t != 4 else 4,
 						interests=self.agent_interests[t]
 					)
 
@@ -77,9 +76,10 @@ class Model:
 				t = np.random.choice(range(self.cell_types), p=self.cell_ratios)
 				self.cells[x, y] = Cell(
 					type=t,
-					price=self.cell_prices[t],
+					price=0,
 					distances=np.empty(shape=(self.point_types))
 				)
+
 
 	# add one point of interest for each type at random locations and update cell distances
 	def generate_points(self):
@@ -91,6 +91,7 @@ class Model:
 				y=random.randint(0, self.size-1)
 			)
 		self.update_distances()
+        
 
 	# calculate distances to each point type for all cells
 	def update_distances(self):
@@ -124,6 +125,14 @@ class Model:
 		if empty_neighbors == len(neighbors):
 			return 0.0
 		return similar_neighbors / (len(neighbors) - empty_neighbors)
+    
+    # Change price of cells
+	def update_price(self):
+		for x in range(self.size):
+			for y in range(self.size):
+				neighbors = self.get_neighbors(x, y)
+				self.cells[x,y].price = 8 - sum([(self.agents[neighbor].type == -1) for neighbor in neighbors])
+
 
 	# check if agent at (x, y) is satisfied or not
 	def is_unsatisfied(self, x, y):
@@ -139,11 +148,13 @@ class Model:
 			desirability += random.random() * self.strategy_weights["random"]
 		
 		if self.strategy_weights["min_price"] > 0.0:
-			desirability += 1 / (cell.price + 0.01) * self.strategy_weights["min_price"]
-		
+			#desirability += 1 / (cell.price + 0.01) * self.strategy_weights["min_price"]
+			desirability += self.strategy_weights["min_price"] if agent.wealth == cell.price else 0
+            
 		if self.strategy_weights["min_point_dist"] > 0.0:
 			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
 			desirability += 1 / (weighted_dist_sum + 0.01) * self.strategy_weights["min_point_dist"]
+			desirability = desirability * agent.wealth == cell.price
 
 		return desirability
 
@@ -166,13 +177,17 @@ class Model:
 			self.agents[empty_location] = self.agents[x, y]
 			self.agents[x, y] = swap
 
+
 	# iterate model
 	def iterate(self):
 		self.iteration += 1
+		self.update_price()
+
 		for x in range(self.size):
 			for y in range(self.size):
 				if self.is_unsatisfied(x, y):
 					self.move_agent(x, y)
+
 
 	# run model for configured number of iterations
 	def run(self):
@@ -180,7 +195,13 @@ class Model:
 		for i in range(self.iterations):
 			self.history_satisfaction[i] = self.get_average_satisfaction()
 			self.history_time[i] = round(time.time()-t0, 2)
-			if i % 10 == 0: print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
+
+			if i % 10 == 0:
+				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
+				plt.imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
+				plt.show()
+				plt.close()
+
 			self.iterate()
 
 	# get average satisfaction of all agents
@@ -210,7 +231,7 @@ class Model:
 		plt.title(f'Cell Types')
 
 		fig.add_subplot(4, 2, 4)
-		plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='cool', vmin=0, vmax=max(self.cell_prices))
+		plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='cool', vmin=0, vmax=max(self.agent_wealths))
 		plt.title(f'Cell Prices')
 
 		fig.add_subplot(4, 2, 5)
@@ -236,24 +257,23 @@ model = Model(
 	size=50,
 	iterations=300,
 	strategy_weights={
-		"random": 0.2,
-		"min_price": 0.0,
-		"min_point_dist": 0.8
+		"random": 0,
+		"min_price": 0,
+		"min_point_dist": 1
 	},
-	empty_ratio=0.2,
-	agent_types=5,
-	agent_ratios=[0.2, 0.2, 0.2, 0.2, 0.2],
-	agent_thresholds=[0.5, 0.5, 0.5, 0.5, 0.5],
-	agent_wealths=[100, 200, 300, 400, 500],
+	empty_ratio=0.4,
+	agent_types=4,
+	agent_ratios=[0.25, 0.25, 0.25, 0.25],
+	agent_thresholds=[0.7, 0.7, 0.7, 0.7, 0.7],
+	agent_wealths=[4, 5, 6, 7, 8],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
-	cell_prices=[100, 200, 300, 400],
 	point_types=2,
 	agent_interests=[
 		[1.0, 0.0],
 		[1.0, 0.0],
 		[1.0, 0.0],
-		[1.0, 0.0],
+		[0.0, 1.0],
 		[0.0, 1.0]
 	]
 )
