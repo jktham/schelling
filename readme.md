@@ -9,7 +9,7 @@ stuff so far:
 
 todo:
 - write comments
-- add benjas price model
+- ~add benjas price model~
 - add weights for combined strategy
 - add random agent interest variations
 - manually add points of interest
