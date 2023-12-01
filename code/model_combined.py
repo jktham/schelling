@@ -64,7 +64,7 @@ class Model:
 					self.agents[x, y] = Agent(
 						type=t,
 						threshold=self.agent_thresholds[t],
-						wealth=self.agent_wealths[t] if t != 4 else 4,
+						wealth=self.agent_wealths[t] if t != 4 else 2,
 						interests=self.agent_interests[t]
 					)
 
