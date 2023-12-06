@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import random
 import math
 import time
+import copy
 
 class Agent:
 	def __init__(self, type, threshold, wealth, interests):
@@ -25,17 +27,22 @@ class Point:
 
 class Model:
 	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
-		self.price_distribution = None
-		self.satisfaction_distribution = None
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
 		self.strategy_weights = strategy_weights
 		self.empty_ratio = empty_ratio
+		self.price_distribution = None
+		self.satisfaction_distribution = None
+
 		self.history_satisfaction_expensive = [0]*iterations
 		self.history_satisfaction_cheap = [0]*iterations
 		self.history_satisfaction = [0]*iterations
 		self.history_time = [0]*iterations
+		self.history_agents = [np.empty(shape=(size, size), dtype=object)]*iterations
+		self.history_cells = [np.empty(shape=(size, size), dtype=object)]*iterations
+		self.history_price_distribution = [None]*iterations
+		self.history_satisfaction_distribution = [None]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -51,6 +58,9 @@ class Model:
 		self.points = np.empty(shape=(point_types), dtype=object)
 		self.point_types = point_types
         
+        
+
+
 
 	# fill agent grid according to types and ratios
 	def generate_agents(self):
@@ -85,7 +95,6 @@ class Model:
 					distances=np.empty(shape=(self.point_types))
 				)
 
-
 	# add one point of interest for each type at random locations and update cell distances
 	def generate_points(self):
 		self.points.fill(None)
@@ -97,6 +106,9 @@ class Model:
 			)
 		self.update_distances()
         
+        
+
+
 
 	# calculate distances to each point type for all cells
 	def update_distances(self):
@@ -123,20 +135,18 @@ class Model:
 	# calculate satisfaction for agent at (x, y). currently only cares about type
 	def get_satisfaction(self, x, y):
 		neighbors = self.get_neighbors(x, y)
-
 		empty_neighbors = sum([(self.agents[neighbor].type == -1) for neighbor in neighbors])
 		similar_neighbors = sum([(self.agents[neighbor].type == self.agents[x, y].type) for neighbor in neighbors])
 
 		if empty_neighbors == len(neighbors):
 			return 0.0
 		return similar_neighbors / (len(neighbors) - empty_neighbors)
-    
-    # get neighbors as list of coordinate tuples around (x, y)
+	
+	# get neighbors as list of coordinate tuples around (x, y)
 	def get_price(self, x, y):
 		return [(i, j) for i in range(max(0, x-2), min(x+3, self.size)) for j in range(max(0, y-2), min(y+3, self.size)) if (i, j) != (x, y)]
 
-    
-    # Change price of cells
+	# Change price of cells
 	def update_price(self):
 		prices = []
 		for x in range(self.size):
@@ -156,7 +166,7 @@ class Model:
 		if self.strategy_weights["min_price"] > 0.0:
 			return (satisfaction < self.agents[x, y].threshold) and (self.agents[x, y].wealth <= self.cells[x,y].price)
 		else:
-   			return (satisfaction < self.agents[x, y].threshold)         
+			return (satisfaction < self.agents[x, y].threshold)         
 	
 	# get desirability score of cell for given agent, depending on strategy weights
 	def get_desirability(self, cell, agent):
@@ -167,7 +177,7 @@ class Model:
 		if self.strategy_weights["min_price"] > 0.0:
 			#desirability += 1 / (cell.price + 0.01) * self.strategy_weights["min_price"]
 			desirability += self.strategy_weights["min_price"] if agent.wealth == cell.price else 0
-            
+			
 		if self.strategy_weights["min_point_dist"] > 0.0:
 			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
 			desirability += 1 / (weighted_dist_sum + 0.01) * self.strategy_weights["min_point_dist"]
@@ -183,7 +193,6 @@ class Model:
 			max_desirability = max(desirabilities)
 			max_desirable_locations = [empty_locations[index] for index, value in enumerate(desirabilities) if value == max_desirability]
 			return random.choice(max_desirable_locations)
-			
 		return None
 
 	# move agent at (x, y) to new empty location
@@ -194,17 +203,14 @@ class Model:
 			self.agents[empty_location] = self.agents[x, y]
 			self.agents[x, y] = swap
 
-
 	# iterate model
 	def iterate(self):
 		self.iteration += 1
 		self.update_price()
-
 		for x in range(self.size):
 			for y in range(self.size):
 				if self.is_unsatisfied(x, y):
 					self.move_agent(x, y)
-
 
 	# run model for configured number of iterations
 	def run(self):
@@ -213,43 +219,14 @@ class Model:
 			self.history_satisfaction_expensive[i] = self.get_average_satisfaction_expensive()
 			self.history_satisfaction_cheap[i] = self.get_average_satisfaction_cheap()
 			self.history_satisfaction[i] = self.get_average_satisfaction()
-
-
 			self.history_time[i] = round(time.time()-t0, 2)
+			self.history_agents[i] = copy.deepcopy(self.agents) # deepcopy might be too slow, benchmark later
+			self.history_cells[i] = copy.deepcopy(self.cells)
+			self.history_price_distribution[i] = np.copy(self.price_distribution)
+			self.history_satisfaction_distribution[i] = np.copy(self.satisfaction_distribution)
 
 			if i % 20 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
-				# Create a histogram of self.satisfaction_distribution
-				# Create a histogram of self.satisfaction_distribution
-				plt.figure(figsize=(12, 6))
-				plt.subplot(131)  # Image of agents
-				plt.imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
-				plt.title('Agent Types')
-
-				plt.subplot(132)  # Histogram of satisfaction_distribution
-				plt.hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
-				plt.xlabel('Satisfaction Level')
-				plt.ylabel('Frequency')
-				plt.title('Satisfaction Distribution')
-
-				#if self.price_distribution!=None:
-
-					#plt.subplot(133)  # Histogram of price_distribution
-					#plt.hist(self.price_distribution, bins=20, color='salmon', edgecolor='black')
-					#plt.xlabel('Price Level')
-					#plt.ylabel('Frequency')
-					#plt.title('Price Distribution')
-
-				# Plot 3: Price Distribution Heatmap
-				plt.subplot(133)
-				plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma')
-				plt.title('Price Distribution')
-				plt.colorbar()
-
-				plt.tight_layout()
-				plt.show()
-				plt.close()
-
 
 			self.iterate()
 
@@ -263,7 +240,7 @@ class Model:
 					sat += self.get_satisfaction(x, y)
 					high_income_agent += 1
 		return sat / high_income_agent
-    
+	
 	# get average satisfaction of all agents
 	def get_average_satisfaction_cheap(self):
 		sat = 0
@@ -274,8 +251,8 @@ class Model:
 					sat += self.get_satisfaction(x, y)
 					low_income_agent += 1
 		return sat / low_income_agent
-    
-    # get average satisfaction of all agents
+	
+	# get average satisfaction of all agents
 	def get_average_satisfaction(self):
 		sat = 0
 		low_income_agent = 0
@@ -287,7 +264,6 @@ class Model:
 					low_income_agent += 1
 					satisfactions += [self.get_satisfaction(x, y)]
 		self.satisfaction_distribution = satisfactions
-
 		return sat / low_income_agent
 
 	def get_satisfaction_distribution(self):
@@ -305,79 +281,70 @@ class Model:
 				price.append(self.cells[x,y].price)
 		return price
     
+    
+	
+	
 	
 	# display current state of model using matplotlib
 	def display(self):
-        
-		fig = plt.figure()
+		fig, ax = plt.subplots(2, 3, figsize=(12, 9))
 		fig.suptitle(f'Schelling Model ({self.iteration} iterations)')
 
-		fig.add_subplot(5, 2, 1)
-		plt.imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
-		plt.title(f'Agent Types')
+		ax[0, 0].set_title(f'Final agents')
+		ax[0, 0].imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
 
-		fig.add_subplot(5, 2, 2)
-		plt.imshow(np.vectorize(lambda a: a.wealth)(self.agents), cmap='cool', vmin=0, vmax=max(self.agent_wealths))
-		plt.title(f'Agent Wealth')
+		ax[1, 0].set_title(f'Agents at iteration 1')
+		ax[1, 0].imshow(np.vectorize(lambda a: a.type)(self.history_agents[0]), cmap='cool', vmin=-1, vmax=self.agent_types)
 
-		fig.add_subplot(5, 2, 3)
-		plt.imshow(np.vectorize(lambda c: c.type)(self.cells), cmap='cool', vmin=0, vmax=self.cell_types)
-		plt.title(f'Cell Types')
+		ax[0, 1].set_title(f'Final prices')
+		ax[0, 1].imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma', vmin=16, vmax=24)
 
-		fig.add_subplot(5, 2, 4)
-		plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='cool', vmin=0, vmax=max(self.agent_wealths))
-		plt.title(f'Cell Prices')
+		ax[1, 1].set_title(f'Prices at iteration 1')
+		ax[1, 1].imshow(np.vectorize(lambda c: c.price)(self.history_cells[0]), cmap='plasma', vmin=16, vmax=24)
 
-		fig.add_subplot(5, 2, 5)
-		plt.imshow(np.vectorize(lambda c: c.distances[0])(self.cells), cmap='cool', vmin=0, vmax=70)
-		plt.title(f'Cell Distances 0')
+		ax[0, 2].set_title(f'Final satisfaction')
+		ax[0, 2].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
 
-		fig.add_subplot(5, 2, 6)
-		plt.imshow(np.vectorize(lambda c: c.distances[1])(self.cells), cmap='cool', vmin=0, vmax=70)
-		plt.title(f'Cell Distances 1')
+		ax[1, 2].set_title(f'Average satisfaction')
+		ax[1, 2].plot(range(0, self.iterations), self.history_satisfaction, label="all")
+		ax[1, 2].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="cheap")
+		ax[1, 2].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="expensive")
+		ax[1, 2].legend()
 
-		fig.add_subplot(5, 2, 7)
-		plt.plot(range(0, self.iterations), self.history_satisfaction_expensive)
-		plt.title(f'Average satisfaction expensive places')
-        
-		fig.add_subplot(5, 2, 8)
-		plt.plot(range(0, self.iterations), self.history_satisfaction_cheap)
-		plt.title(f'Average satisfaction cheap places')
+		def animate(frame):
+			ax[1, 0].set_title(f'Agents at iteration {frame+1}/{self.iteration}')
+			ax[1, 0].get_images()[0].set_data(np.vectorize(lambda a: a.type)(self.history_agents[frame]))
 
-		fig.add_subplot(5, 2, 9)
-		plt.plot(range(0, self.iterations), self.history_satisfaction)
-		plt.title(f'Average satisfaction')
-        
-		fig.add_subplot(5, 2, 10)
-		plt.plot(range(0, self.iterations), self.history_time)
-		plt.title(f'Simulation Time')
-        
-		plt.savefig("plot.png")
+			ax[1, 1].set_title(f'Prices at iteration {frame+1}/{self.iteration}')
+			ax[1, 1].get_images()[0].set_data(np.vectorize(lambda c: c.price)(self.history_cells[frame]))
+		
+		anim = animation.FuncAnimation(fig=fig, func=animate, frames=self.iterations, interval=50)
+
+		plt.tight_layout()
+		plt.savefig("plot.png", dpi=144)
 		plt.show()
 
 # example model
 model = Model(
-	size=25,
-	iterations=150,
+	size=50,
+	iterations=100,
 	strategy_weights={
 		"random": 0.2,
 		"min_price": 0.6,
-		"min_point_dist": 0
+		"min_point_dist": 0.0
 	},
 	empty_ratio=0.3,
 	agent_types=3,
 	agent_ratios=[1/3]*3,
-	agent_thresholds=[0.4, 0.4, 0.4, 0.4, 0.4],
-	agent_wealths=[16, 20, 24, 22, 18],
+	agent_thresholds=[0.4]*3,
+	agent_wealths=[16, 20, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
 	point_types=2,
 	agent_interests=[
 		[1.0, 0.0],
 		[1.0, 0.0],
-		[1.0, 0.0],
-		[0.0, 1.0],
-		[0.0, 1.0]
+		[1.0, 0.0]
 	]
 )
 
