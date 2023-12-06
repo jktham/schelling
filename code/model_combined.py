@@ -25,6 +25,8 @@ class Point:
 
 class Model:
 	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
+		self.price_distribution = None
+		self.satisfaction_distribution = None
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
@@ -136,19 +138,23 @@ class Model:
     
     # Change price of cells
 	def update_price(self):
+		prices = []
 		for x in range(self.size):
 			for y in range(self.size):
-				neighbors = self.get_price(x, y)
+				neighbors = self.get_neighbors(x, y)
 				self.cells[x,y].price = 24 - sum([(self.agents[neighbor].type == -1) for neighbor in neighbors])
+				prices += [self.cells[x,y].price]
 
-                
+		print(np.median(prices), np.min(prices), np.max(prices), np.mean(prices), np.std(prices))
+		self.price_distribution = prices
+
 	# check if agent at (x, y) is satisfied or not
 	def is_unsatisfied(self, x, y):
 		if self.agents[x, y].type == -1:
 			return False
 		satisfaction = self.get_satisfaction(x, y)
 		if self.strategy_weights["min_price"] > 0.0:
-			return (satisfaction < self.agents[x, y].threshold) and (self.agents[x, y].wealth == self.cells[x,y].price)
+			return (satisfaction < self.agents[x, y].threshold) and (self.agents[x, y].wealth <= self.cells[x,y].price)
 		else:
    			return (satisfaction < self.agents[x, y].threshold)         
 	
@@ -211,18 +217,46 @@ class Model:
 
 			self.history_time[i] = round(time.time()-t0, 2)
 
-			if i % 10 == 0:
+			if i % 20 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
+				# Create a histogram of self.satisfaction_distribution
+				# Create a histogram of self.satisfaction_distribution
+				plt.figure(figsize=(12, 6))
+				plt.subplot(131)  # Image of agents
 				plt.imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
+				plt.title('Agent Types')
+
+				plt.subplot(132)  # Histogram of satisfaction_distribution
+				plt.hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
+				plt.xlabel('Satisfaction Level')
+				plt.ylabel('Frequency')
+				plt.title('Satisfaction Distribution')
+
+				#if self.price_distribution!=None:
+
+					#plt.subplot(133)  # Histogram of price_distribution
+					#plt.hist(self.price_distribution, bins=20, color='salmon', edgecolor='black')
+					#plt.xlabel('Price Level')
+					#plt.ylabel('Frequency')
+					#plt.title('Price Distribution')
+
+				# Plot 3: Price Distribution Heatmap
+				plt.subplot(133)
+				plt.imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma')
+				plt.title('Price Distribution')
+				plt.colorbar()
+
+				plt.tight_layout()
 				plt.show()
 				plt.close()
+
 
 			self.iterate()
 
 	# get average satisfaction of all agents
 	def get_average_satisfaction_expensive(self):
 		sat = 0
-		high_income_agent = 0.00001
+		high_income_agent = 1
 		for x in range(self.size):
 			for y in range(self.size):
 				if (self.agents[x, y].type != -1) and (self.cells[x,y].price > 19):
@@ -230,11 +264,10 @@ class Model:
 					high_income_agent += 1
 		return sat / high_income_agent
     
-    
 	# get average satisfaction of all agents
 	def get_average_satisfaction_cheap(self):
 		sat = 0
-		low_income_agent = 0
+		low_income_agent = 1
 		for x in range(self.size):
 			for y in range(self.size):
 				if (self.agents[x, y].type != -1) and (self.cells[x,y].price < 19):
@@ -246,14 +279,31 @@ class Model:
 	def get_average_satisfaction(self):
 		sat = 0
 		low_income_agent = 0
+		satisfactions = []
 		for x in range(self.size):
 			for y in range(self.size):
 				if (self.agents[x, y].type != -1):
 					sat += self.get_satisfaction(x, y)
 					low_income_agent += 1
+					satisfactions += [self.get_satisfaction(x, y)]
+		self.satisfaction_distribution = satisfactions
+
 		return sat / low_income_agent
-    
-    
+
+	def get_satisfaction_distribution(self):
+		sat = []
+		for x in range(self.size):
+			for y in range(self.size):
+				if (self.agents[x, y].type != -1):
+					sat.append(self.get_satisfaction(x, y))
+		return sat
+
+	def get_price_distribution(self):
+		price = []
+		for x in range(self.size):
+			for y in range(self.size):
+				price.append(self.cells[x,y].price)
+		return price
     
 	
 	# display current state of model using matplotlib
@@ -294,7 +344,6 @@ class Model:
 		plt.plot(range(0, self.iterations), self.history_satisfaction_cheap)
 		plt.title(f'Average satisfaction cheap places')
 
-
 		fig.add_subplot(5, 2, 9)
 		plt.plot(range(0, self.iterations), self.history_satisfaction)
 		plt.title(f'Average satisfaction')
@@ -302,27 +351,24 @@ class Model:
 		fig.add_subplot(5, 2, 10)
 		plt.plot(range(0, self.iterations), self.history_time)
 		plt.title(f'Simulation Time')
-                
         
 		plt.savefig("plot.png")
 		plt.show()
 
-
-
 # example model
 model = Model(
 	size=25,
-	iterations=300,
+	iterations=150,
 	strategy_weights={
-		"random": 1,
-		"min_price": 0,
+		"random": 0.2,
+		"min_price": 0.6,
 		"min_point_dist": 0
 	},
 	empty_ratio=0.3,
-	agent_types= 3,
-	agent_ratios=[1/3, 1/3, 1/3],
-	agent_thresholds=[0.5, 0.5, 0.5, 0.5, 0.5],
-	agent_wealths=[16, 18, 20, 22, 24],
+	agent_types=3,
+	agent_ratios=[1/3]*3,
+	agent_thresholds=[0.4, 0.4, 0.4, 0.4, 0.4],
+	agent_wealths=[16, 20, 24, 22, 18],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
 	point_types=2,
