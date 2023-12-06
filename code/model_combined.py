@@ -26,7 +26,8 @@ class Point:
 		self.y = y
 
 class Model:
-	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
+	def __init__(self, name, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
+		self.name = name
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
@@ -57,10 +58,6 @@ class Model:
 
 		self.points = np.empty(shape=(point_types), dtype=object)
 		self.point_types = point_types
-        
-        
-
-
 
 	# fill agent grid according to types and ratios
 	def generate_agents(self):
@@ -105,10 +102,6 @@ class Model:
 				y=random.randint(0, self.size-1)
 			)
 		self.update_distances()
-        
-        
-
-
 
 	# calculate distances to each point type for all cells
 	def update_distances(self):
@@ -132,8 +125,8 @@ class Model:
 	def get_neighbors(self, x, y):
 		return [(i, j) for i in range(max(0, x-1), min(x+2, self.size)) for j in range(max(0, y-1), min(y+2, self.size)) if (i, j) != (x, y)]
 
-	# calculate satisfaction for agent at (x, y). currently only cares about type
-	def get_satisfaction(self, x, y):
+	# calculate similarity for agent at (x, y). only cares about type
+	def get_similarity(self, x, y):
 		neighbors = self.get_neighbors(x, y)
 		empty_neighbors = sum([(self.agents[neighbor].type == -1) for neighbor in neighbors])
 		similar_neighbors = sum([(self.agents[neighbor].type == self.agents[x, y].type) for neighbor in neighbors])
@@ -141,6 +134,12 @@ class Model:
 		if empty_neighbors == len(neighbors):
 			return 0.0
 		return similar_neighbors / (len(neighbors) - empty_neighbors)
+	
+	# calculate satisfaction for agent at (x, y)
+	def get_satisfaction(self, x, y):
+		similarity = self.get_similarity(x, y)
+		desirability = self.get_desirability(self.cells[x, y], self.agents[x, y])
+		return 0.5 * similarity + 0.5 * desirability
 	
 	# get neighbors as list of coordinate tuples around (x, y)
 	def get_price(self, x, y):
@@ -180,8 +179,8 @@ class Model:
 			
 		if self.strategy_weights["min_point_dist"] > 0.0:
 			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
-			desirability += 1 / (weighted_dist_sum + 0.01) * self.strategy_weights["min_point_dist"]
-			desirability = desirability * agent.wealth == cell.price
+			desirability += 1 / (weighted_dist_sum + 1.0) * self.strategy_weights["min_point_dist"]
+			# desirability = desirability * agent.wealth == cell.price
 
 		return desirability
 
@@ -280,26 +279,22 @@ class Model:
 			for y in range(self.size):
 				price.append(self.cells[x,y].price)
 		return price
-    
-    
-	
-	
 	
 	# display current state of model using matplotlib
 	def display(self):
 		fig, ax = plt.subplots(2, 3, figsize=(12, 9))
-		fig.suptitle(f'Schelling Model ({self.iteration} iterations)')
+		fig.suptitle(f'Schelling Model ("{self.name}", strategy ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]}))')
 
 		ax[0, 0].set_title(f'Final agents')
 		ax[0, 0].imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
 
-		ax[1, 0].set_title(f'Agents at iteration 1')
+		ax[1, 0].set_title(f'Agents at iteration 1/{self.iterations}')
 		ax[1, 0].imshow(np.vectorize(lambda a: a.type)(self.history_agents[0]), cmap='cool', vmin=-1, vmax=self.agent_types)
 
 		ax[0, 1].set_title(f'Final prices')
 		ax[0, 1].imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma', vmin=16, vmax=24)
 
-		ax[1, 1].set_title(f'Prices at iteration 1')
+		ax[1, 1].set_title(f'Prices at iteration 1/{self.iterations}')
 		ax[1, 1].imshow(np.vectorize(lambda c: c.price)(self.history_cells[0]), cmap='plasma', vmin=16, vmax=24)
 
 		ax[0, 2].set_title(f'Final satisfaction')
@@ -312,26 +307,27 @@ class Model:
 		ax[1, 2].legend()
 
 		def animate(frame):
-			ax[1, 0].set_title(f'Agents at iteration {frame+1}/{self.iteration}')
+			ax[1, 0].set_title(f'Agents at iteration {frame+1}/{self.iterations}')
 			ax[1, 0].get_images()[0].set_data(np.vectorize(lambda a: a.type)(self.history_agents[frame]))
 
-			ax[1, 1].set_title(f'Prices at iteration {frame+1}/{self.iteration}')
+			ax[1, 1].set_title(f'Prices at iteration {frame+1}/{self.iterations}')
 			ax[1, 1].get_images()[0].set_data(np.vectorize(lambda c: c.price)(self.history_cells[frame]))
 		
 		anim = animation.FuncAnimation(fig=fig, func=animate, frames=self.iterations, interval=50)
 
-		plt.tight_layout()
-		plt.savefig("plot.png", dpi=144)
+		fig.savefig(f'{self.name}.png', dpi=144)
+		anim.save(f'{self.name}.gif', fps=20, writer="pillow")
 		plt.show()
 
 # example model
 model = Model(
+	name="test",
 	size=50,
 	iterations=100,
 	strategy_weights={
 		"random": 0.2,
 		"min_price": 0.6,
-		"min_point_dist": 0.0
+		"min_point_dist": 0.1
 	},
 	empty_ratio=0.3,
 	agent_types=3,
