@@ -27,7 +27,7 @@ class Point:
 		self.y = y
 
 class Model:
-	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
+	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, points, agent_interests):
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
@@ -46,6 +46,7 @@ class Model:
 		self.history_price_distribution = [None]*iterations
 		self.history_satisfaction_distribution = [None]*iterations
 		self.history_moved = [np.zeros(shape=(size, size))]*iterations
+		self.history_moved_count = [0]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -58,7 +59,7 @@ class Model:
 		self.cell_types = cell_types
 		self.cell_ratios = cell_ratios
 
-		self.points = np.empty(shape=(point_types), dtype=object)
+		self.points = points
 		self.point_types = point_types
 
 	# fill agent grid according to types and ratios
@@ -96,13 +97,11 @@ class Model:
 
 	# add one point of interest for each type at random locations and update cell distances
 	def generate_points(self):
-		self.points.fill(None)
-		for i in range(len(self.points)):
-			self.points[i] = Point(
-				type=i,
-				x=random.randint(0, self.size-1),
-				y=random.randint(0, self.size-1)
-			)
+		for p in self.points:
+			if p.x == None:
+				p.x = random.randint(0, self.size-1)
+			if p.y == None:
+				p.y = random.randint(0, self.size-1)
 		self.update_distances()
 
 	# calculate distances to each point type for all cells
@@ -228,6 +227,7 @@ class Model:
 			self.history_price_distribution[i] = np.copy(self.price_distribution)
 			self.history_satisfaction_distribution[i] = np.copy(self.satisfaction_distribution)
 			self.history_moved[i] = np.copy(self.moved)
+			self.history_moved_count[i] = np.sum(self.moved)
 
 			if i % 10 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
@@ -288,7 +288,7 @@ class Model:
 	# display current state of model using matplotlib
 	def display(self):
 		fig, ax = plt.subplots(2, 4, figsize=(16, 9))
-		fig.suptitle(f'strategy: ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]})')
+		fig.suptitle(f'size: {self.size}, iterations: {self.iterations}, strategy: ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]})')
 
 		ax[0, 0].set_title(f'Final agents')
 		ax[0, 0].imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
@@ -296,10 +296,13 @@ class Model:
 		ax[0, 1].set_title(f'Final prices')
 		ax[0, 1].imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma', vmin=16, vmax=24)
 
-		ax[0, 2].set_title(f'Final satisfaction')
-		ax[0, 2].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
+		# ax[0, 2].set_title(f'Final satisfaction')
+		# ax[0, 2].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
 
-		ax[0, 3].set_title(f'Average satisfaction')
+		ax[0, 2].set_title(f'Moves over time')
+		ax[0, 2].plot(range(0, self.iterations), self.history_moved_count)
+
+		ax[0, 3].set_title(f'Avg satisfaction over time')
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="cheap")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="expensive")
@@ -316,7 +319,7 @@ class Model:
 
 		ax[1, 3].set_title(f'Points of interest')
 		for p in self.points:
-			ax[1, 3].scatter(p.x, p.y, label=p.type)
+			ax[1, 3].scatter(p.y, p.x, label=p.type)
 		ax[1, 3].legend()
 		ax[1, 3].set_xlim([0, 50])
 		ax[1, 3].set_ylim([0, 50][::-1])
@@ -345,20 +348,24 @@ class Model:
 # example model
 model = Model(
 	size=50,
-	iterations=200,
+	iterations=100,
 	strategy_weights={
-		"random": 1.0,
-		"min_price": 0.0,
+		"random": 0.2,
+		"min_price": 0.8,
 		"min_point_dist": 0.0
 	},
 	empty_ratio=0.2,
 	agent_types=3,
 	agent_ratios=[1/3]*3,
-	agent_thresholds=[0.4]*3,
+	agent_thresholds=[0.3]*3,
 	agent_wealths=[16, 20, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
 	point_types=2,
+	points=[
+		Point(type=0, x=None, y=None),
+		Point(type=1, x=None, y=None)
+	],
 	agent_interests=[
 		[1.0, 0.0],
 		[1.0, 0.0],

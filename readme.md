@@ -8,12 +8,13 @@ stuff so far:
 - model_combined: combine above approaches, add points of interest that agents want to move closer to depending on preferences, maybe model real city
 
 todo:
-- write comments
+- ~write comments~
 - ~add benjas price model~
-- add weights for combined strategy
+- ~add weights for combined strategy~
 - add random agent interest variations
-- manually add points of interest
-- manually define cell types (ie lake)
-- output statistics, maybe animate grid
+- ~manually add points of interest~
+- ~manually define cell types (ie lake)~
+- ~output statistics, maybe animate grid~
 - increase size -> improve performance, currently 1-2 min for size 50, 300 iterations (maybe port final version to c++?)
 - presort cells by distance
+- show parameters on output plot
