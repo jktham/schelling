@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -26,8 +27,7 @@ class Point:
 		self.y = y
 
 class Model:
-	def __init__(self, name, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
-		self.name = name
+	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, agent_interests):
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
@@ -35,6 +35,7 @@ class Model:
 		self.empty_ratio = empty_ratio
 		self.price_distribution = None
 		self.satisfaction_distribution = None
+		self.moved = np.zeros(shape=(size, size))
 
 		self.history_satisfaction_expensive = [0]*iterations
 		self.history_satisfaction_cheap = [0]*iterations
@@ -44,6 +45,7 @@ class Model:
 		self.history_cells = [np.empty(shape=(size, size), dtype=object)]*iterations
 		self.history_price_distribution = [None]*iterations
 		self.history_satisfaction_distribution = [None]*iterations
+		self.history_moved = [np.zeros(shape=(size, size))]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -201,14 +203,16 @@ class Model:
 			swap = self.agents[empty_location]
 			self.agents[empty_location] = self.agents[x, y]
 			self.agents[x, y] = swap
+			self.moved[empty_location] = 1
 
 	# iterate model
 	def iterate(self):
+		self.moved.fill(0)
 		self.iteration += 1
 		self.update_price()
 		for x in range(self.size):
 			for y in range(self.size):
-				if self.is_unsatisfied(x, y):
+				if self.is_unsatisfied(x, y) and self.moved[x, y] == 0:
 					self.move_agent(x, y)
 
 	# run model for configured number of iterations
@@ -223,8 +227,9 @@ class Model:
 			self.history_cells[i] = copy.deepcopy(self.cells)
 			self.history_price_distribution[i] = np.copy(self.price_distribution)
 			self.history_satisfaction_distribution[i] = np.copy(self.satisfaction_distribution)
+			self.history_moved[i] = np.copy(self.moved)
 
-			if i % 20 == 0:
+			if i % 10 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
 
 			self.iterate()
@@ -282,29 +287,39 @@ class Model:
 	
 	# display current state of model using matplotlib
 	def display(self):
-		fig, ax = plt.subplots(2, 3, figsize=(12, 9))
-		fig.suptitle(f'Schelling Model ("{self.name}", strategy ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]}))')
+		fig, ax = plt.subplots(2, 4, figsize=(16, 9))
+		fig.suptitle(f'strategy: ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]})')
 
 		ax[0, 0].set_title(f'Final agents')
 		ax[0, 0].imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
 
-		ax[1, 0].set_title(f'Agents at iteration 1/{self.iterations}')
-		ax[1, 0].imshow(np.vectorize(lambda a: a.type)(self.history_agents[0]), cmap='cool', vmin=-1, vmax=self.agent_types)
-
 		ax[0, 1].set_title(f'Final prices')
 		ax[0, 1].imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma', vmin=16, vmax=24)
-
-		ax[1, 1].set_title(f'Prices at iteration 1/{self.iterations}')
-		ax[1, 1].imshow(np.vectorize(lambda c: c.price)(self.history_cells[0]), cmap='plasma', vmin=16, vmax=24)
 
 		ax[0, 2].set_title(f'Final satisfaction')
 		ax[0, 2].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
 
-		ax[1, 2].set_title(f'Average satisfaction')
-		ax[1, 2].plot(range(0, self.iterations), self.history_satisfaction, label="all")
-		ax[1, 2].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="cheap")
-		ax[1, 2].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="expensive")
-		ax[1, 2].legend()
+		ax[0, 3].set_title(f'Average satisfaction')
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="cheap")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="expensive")
+		ax[0, 3].legend()
+
+		ax[1, 0].set_title(f'Agents at iteration 1/{self.iterations}')
+		ax[1, 0].imshow(np.vectorize(lambda a: a.type)(self.history_agents[0]), cmap='cool', vmin=-1, vmax=self.agent_types)
+
+		ax[1, 1].set_title(f'Prices at iteration 1/{self.iterations}')
+		ax[1, 1].imshow(np.vectorize(lambda c: c.price)(self.history_cells[0]), cmap='plasma', vmin=16, vmax=24)
+
+		ax[1, 2].set_title(f'Moves at iteration 1/{self.iterations}')
+		ax[1, 2].imshow(self.history_moved[0], cmap='hot', vmin=0, vmax=1)
+
+		ax[1, 3].set_title(f'Points of interest')
+		for p in self.points:
+			ax[1, 3].scatter(p.x, p.y, label=p.type)
+		ax[1, 3].legend()
+		ax[1, 3].set_xlim([0, 50])
+		ax[1, 3].set_ylim([0, 50][::-1])
 
 		def animate(frame):
 			ax[1, 0].set_title(f'Agents at iteration {frame+1}/{self.iterations}')
@@ -312,24 +327,31 @@ class Model:
 
 			ax[1, 1].set_title(f'Prices at iteration {frame+1}/{self.iterations}')
 			ax[1, 1].get_images()[0].set_data(np.vectorize(lambda c: c.price)(self.history_cells[frame]))
-		
+
+			ax[1, 2].set_title(f'Moves at iteration {frame+1}/{self.iterations}')
+			ax[1, 2].get_images()[0].set_data(self.history_moved[frame])
+
 		anim = animation.FuncAnimation(fig=fig, func=animate, frames=self.iterations, interval=50)
 
-		fig.savefig(f'{self.name}.png', dpi=144)
-		anim.save(f'{self.name}.gif', fps=20, writer="pillow")
+		i = 1
+		while os.path.exists(f'plots/plot_{str(i).zfill(3)}.png') or os.path.exists(f'plots/plot_{str(i).zfill(3)}.gif'):
+			i += 1
+
+		# fig.savefig(f'plots/plot_{str(i).zfill(3)}.png', dpi=144)
+		anim.save(f'plots/plot_{str(i).zfill(3)}.gif', dpi=144, fps=20, writer="pillow")
+
 		plt.show()
 
 # example model
 model = Model(
-	name="test",
 	size=50,
-	iterations=100,
+	iterations=200,
 	strategy_weights={
-		"random": 0.2,
-		"min_price": 0.6,
-		"min_point_dist": 0.1
+		"random": 1.0,
+		"min_price": 0.0,
+		"min_point_dist": 0.0
 	},
-	empty_ratio=0.3,
+	empty_ratio=0.2,
 	agent_types=3,
 	agent_ratios=[1/3]*3,
 	agent_thresholds=[0.4]*3,
