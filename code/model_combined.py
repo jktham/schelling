@@ -27,11 +27,12 @@ class Point:
 		self.y = y
 
 class Model:
-	def __init__(self, size, iterations, strategy_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, points, agent_interests):
+	def __init__(self, size, iterations, strategy_weights, satisfaction_weights, empty_ratio, agent_types, agent_ratios, agent_thresholds, agent_wealths, cell_types, cell_ratios, point_types, points, agent_interests):
 		self.size = size
 		self.iterations = iterations
 		self.iteration = 0
 		self.strategy_weights = strategy_weights
+		self.satisfaction_weights = satisfaction_weights
 		self.empty_ratio = empty_ratio
 		self.price_distribution = None
 		self.satisfaction_distribution = None
@@ -47,6 +48,7 @@ class Model:
 		self.history_satisfaction_distribution = [None]*iterations
 		self.history_moved = [np.zeros(shape=(size, size))]*iterations
 		self.history_moved_count = [0]*iterations
+		self.history_satisfaction_grid = [np.zeros(shape=(size, size))]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -140,7 +142,7 @@ class Model:
 	def get_satisfaction(self, x, y):
 		similarity = self.get_similarity(x, y)
 		desirability = self.get_desirability(self.cells[x, y], self.agents[x, y])
-		return 0.5 * similarity + 0.5 * desirability
+		return self.satisfaction_weights[0] * similarity + self.satisfaction_weights[1] * desirability
 	
 	# get neighbors as list of coordinate tuples around (x, y)
 	def get_price(self, x, y):
@@ -228,11 +230,19 @@ class Model:
 			self.history_satisfaction_distribution[i] = np.copy(self.satisfaction_distribution)
 			self.history_moved[i] = np.copy(self.moved)
 			self.history_moved_count[i] = np.sum(self.moved)
-
+			self.history_satisfaction_grid[i] = self.get_satisfaction_grid()
+			
 			if i % 10 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
 
 			self.iterate()
+
+	def get_satisfaction_grid(self):
+		satisfaction_grid = np.zeros(shape=(self.size, self.size))
+		for x in range(self.size):
+			for y in range(self.size):
+				satisfaction_grid[x, y] = self.get_satisfaction(x, y)
+		return satisfaction_grid
 
 	# get average satisfaction of all agents
 	def get_average_satisfaction_expensive(self):
@@ -287,8 +297,9 @@ class Model:
 	
 	# display current state of model using matplotlib
 	def display(self):
-		fig, ax = plt.subplots(2, 4, figsize=(16, 9))
-		fig.suptitle(f'size: {self.size}, iterations: {self.iterations}, strategy: ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]})')
+		fig, ax = plt.subplots(2, 5, figsize=(16, 8))
+		fig.tight_layout(rect=[0, 0.02, 1, 0.92])
+		fig.suptitle(f'size: {self.size}, iterations: {self.iterations}, strategy: ({self.strategy_weights["random"]}, {self.strategy_weights["min_price"]}, {self.strategy_weights["min_point_dist"]}), satisfaction: {self.satisfaction_weights}, empty: {self.empty_ratio}, \ntypes: {self.agent_types}, ratios: {np.round(self.agent_ratios, 2)}, thresholds: {self.agent_thresholds}, wealths: {self.agent_wealths}, interests: {self.agent_interests}', wrap=True)
 
 		ax[0, 0].set_title(f'Final agents')
 		ax[0, 0].imshow(np.vectorize(lambda a: a.type)(self.agents), cmap='cool', vmin=-1, vmax=self.agent_types)
@@ -296,17 +307,20 @@ class Model:
 		ax[0, 1].set_title(f'Final prices')
 		ax[0, 1].imshow(np.vectorize(lambda c: c.price)(self.cells), cmap='plasma', vmin=16, vmax=24)
 
-		# ax[0, 2].set_title(f'Final satisfaction')
-		# ax[0, 2].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
-
 		ax[0, 2].set_title(f'Moves over time')
 		ax[0, 2].plot(range(0, self.iterations), self.history_moved_count)
+		ax[0, 2].set_box_aspect(1)
 
 		ax[0, 3].set_title(f'Avg satisfaction over time')
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="cheap")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="expensive")
 		ax[0, 3].legend()
+		ax[0, 3].set_box_aspect(1)
+
+		ax[0, 4].set_title(f'Final satisfaction')
+		ax[0, 4].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
+		ax[0, 4].set_box_aspect(1)
 
 		ax[1, 0].set_title(f'Agents at iteration 1/{self.iterations}')
 		ax[1, 0].imshow(np.vectorize(lambda a: a.type)(self.history_agents[0]), cmap='cool', vmin=-1, vmax=self.agent_types)
@@ -317,12 +331,16 @@ class Model:
 		ax[1, 2].set_title(f'Moves at iteration 1/{self.iterations}')
 		ax[1, 2].imshow(self.history_moved[0], cmap='hot', vmin=0, vmax=1)
 
-		ax[1, 3].set_title(f'Points of interest')
+		ax[1, 3].set_title(f'Satisfaction at iteration 1/{self.iterations}')
+		ax[1, 3].imshow(self.history_satisfaction_grid[0], cmap='plasma', vmin=0, vmax=1)
+
+		ax[1, 4].set_title(f'Points of interest')
 		for p in self.points:
-			ax[1, 3].scatter(p.y, p.x, label=p.type)
-		ax[1, 3].legend()
-		ax[1, 3].set_xlim([0, 50])
-		ax[1, 3].set_ylim([0, 50][::-1])
+			ax[1, 4].scatter(p.y, p.x, label=p.type)
+		ax[1, 4].legend()
+		ax[1, 4].set_xlim([0, self.size-1])
+		ax[1, 4].set_ylim([0, self.size-1][::-1])
+		ax[1, 4].set_box_aspect(1)
 
 		def animate(frame):
 			ax[1, 0].set_title(f'Agents at iteration {frame+1}/{self.iterations}')
@@ -334,6 +352,9 @@ class Model:
 			ax[1, 2].set_title(f'Moves at iteration {frame+1}/{self.iterations}')
 			ax[1, 2].get_images()[0].set_data(self.history_moved[frame])
 
+			ax[1, 3].set_title(f'Satisfaction at iteration {frame+1}/{self.iterations}')
+			ax[1, 3].get_images()[0].set_data(self.history_satisfaction_grid[frame])
+
 		anim = animation.FuncAnimation(fig=fig, func=animate, frames=self.iterations, interval=50)
 
 		i = 1
@@ -343,21 +364,25 @@ class Model:
 		# fig.savefig(f'plots/plot_{str(i).zfill(3)}.png', dpi=144)
 		anim.save(f'plots/plot_{str(i).zfill(3)}.gif', dpi=144, fps=20, writer="pillow")
 
-		plt.show()
+		# plt.show()
 
 # example model
 model = Model(
 	size=50,
 	iterations=100,
 	strategy_weights={
-		"random": 0.2,
-		"min_price": 0.8,
-		"min_point_dist": 0.0
+		"random": 0.0,
+		"min_price": 0.5,
+		"min_point_dist": 0.5
 	},
+	satisfaction_weights=[
+		0.5, # similarity
+		0.5 # desirability
+	],
 	empty_ratio=0.2,
 	agent_types=3,
 	agent_ratios=[1/3]*3,
-	agent_thresholds=[0.3]*3,
+	agent_thresholds=[0.4]*3,
 	agent_wealths=[16, 20, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
