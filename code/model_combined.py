@@ -183,7 +183,7 @@ class Model:
 		if self.strategy_weights["min_point_dist"] > 0.0:
 			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
 			desirability += 1 / (weighted_dist_sum + 1.0) * self.strategy_weights["min_point_dist"]
-			# desirability = desirability * agent.wealth == cell.price
+			desirability = desirability * agent.wealth == cell.price
 
 		return desirability
 
@@ -313,8 +313,8 @@ class Model:
 
 		ax[0, 3].set_title(f'Avg satisfaction over time')
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
-		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="cheap")
-		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="expensive")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="poor")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="wealthy")
 		ax[0, 3].legend()
 		ax[0, 3].set_box_aspect(1)
 
@@ -371,9 +371,9 @@ model = Model(
 	size=50,
 	iterations=100,
 	strategy_weights={
-		"random": 0.0,
-		"min_price": 0.5,
-		"min_point_dist": 0.5
+		"random": 0.2,
+		"min_price": 0.4,
+		"min_point_dist": 0.4
 	},
 	satisfaction_weights=[
 		0.5, # similarity
