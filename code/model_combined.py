@@ -183,7 +183,7 @@ class Model:
 		if self.strategy_weights["min_point_dist"] > 0.0:
 			weighted_dist_sum = sum([cell.distances[self.points[i].type] * agent.interests[self.points[i].type] for i in range(len(self.points))])
 			desirability += 1 / (weighted_dist_sum + 1.0) * self.strategy_weights["min_point_dist"]
-			desirability = desirability * agent.wealth == cell.price
+			# desirability = desirability * agent.wealth == cell.price
 
 		return desirability
 
@@ -311,15 +311,16 @@ class Model:
 		ax[0, 2].plot(range(0, self.iterations), self.history_moved_count)
 		ax[0, 2].set_box_aspect(1)
 
-		ax[0, 3].set_title(f'Avg satisfaction over time')
+		ax[0, 3].set_title(f'Avg. satisfaction over time')
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="poor")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="wealthy")
 		ax[0, 3].legend()
 		ax[0, 3].set_box_aspect(1)
 
-		ax[0, 4].set_title(f'Final satisfaction')
+		ax[0, 4].set_title(f'Final satisfaction distr.')
 		ax[0, 4].hist(self.satisfaction_distribution, bins=20, color='skyblue', edgecolor='black')
+		ax[0, 4].set_xlim([0, 1])
 		ax[0, 4].set_box_aspect(1)
 
 		ax[1, 0].set_title(f'Agents at iteration 1/{self.iterations}')
@@ -368,11 +369,11 @@ class Model:
 
 # example model
 model = Model(
-	size=50,
+	size=100,
 	iterations=100,
 	strategy_weights={
-		"random": 0.2,
-		"min_price": 0.4,
+		"random": 0.4,
+		"min_price": 0.2,
 		"min_point_dist": 0.4
 	},
 	satisfaction_weights=[
@@ -380,21 +381,25 @@ model = Model(
 		0.5 # desirability
 	],
 	empty_ratio=0.2,
-	agent_types=3,
-	agent_ratios=[1/3]*3,
-	agent_thresholds=[0.4]*3,
-	agent_wealths=[16, 20, 24],
+	agent_types=5,
+	agent_ratios=[1/5]*5,
+	agent_thresholds=[0.3]*5,
+	agent_wealths=[16, 18, 20, 22, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
-	point_types=2,
+	point_types=4,
 	points=[
-		Point(type=0, x=None, y=None),
-		Point(type=1, x=None, y=None)
+		Point(type=0, x=30, y=30),
+		Point(type=1, x=30, y=70),
+		Point(type=2, x=75, y=50),
+		Point(type=3, x=50, y=50)
 	],
 	agent_interests=[
-		[1.0, 0.0],
-		[1.0, 0.0],
-		[1.0, 0.0]
+		[0.3, 0.0, 0.0, 0.8],
+		[0.0, 0.3, 0.0, 0.8],
+		[0.0, 0.0, 0.3, 0.8],
+		[0.0, 0.0, 0.0, 1.0],
+		[0.0, 0.0, 0.0, 1.0]
 	]
 )
 
