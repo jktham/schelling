@@ -384,7 +384,7 @@ model = Model(
 	agent_types=5,
 	agent_ratios=[1/5]*5,
 	agent_thresholds=[0.3]*5,
-	agent_wealths=[16, 18, 20, 22, 24],
+	agent_wealths=[16, 18, 19, 22, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
 	point_types=4,
@@ -395,10 +395,10 @@ model = Model(
 		Point(type=3, x=50, y=50)
 	],
 	agent_interests=[
+		[0.0, 0.0, 0.0, 1.0],
 		[0.3, 0.0, 0.0, 0.8],
 		[0.0, 0.3, 0.0, 0.8],
 		[0.0, 0.0, 0.3, 0.8],
-		[0.0, 0.0, 0.0, 1.0],
 		[0.0, 0.0, 0.0, 1.0]
 	]
 )

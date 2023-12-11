@@ -18,6 +18,7 @@ todo:
 - increase size -> improve performance, currently 1-2 min for size 50, 300 iterations (maybe port final version to c++?)
 - presort cells by distance
 - ~show parameters on output plot~
+- plot similarity satisfaction only, compare models
 
 results:
 
