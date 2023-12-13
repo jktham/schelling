@@ -49,6 +49,7 @@ class Model:
 		self.history_moved = [np.zeros(shape=(size, size))]*iterations
 		self.history_moved_count = [0]*iterations
 		self.history_satisfaction_grid = [np.zeros(shape=(size, size))]*iterations
+		self.history_similarity = [0]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -231,6 +232,7 @@ class Model:
 			self.history_moved[i] = np.copy(self.moved)
 			self.history_moved_count[i] = np.sum(self.moved)
 			self.history_satisfaction_grid[i] = self.get_satisfaction_grid()
+			self.history_similarity[i] = self.get_average_similarity()
 			
 			if i % 10 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
@@ -269,17 +271,31 @@ class Model:
 	# get average satisfaction of all agents
 	def get_average_satisfaction(self):
 		sat = 0
-		low_income_agent = 0
+		agent = 0
 		satisfactions = []
 		for x in range(self.size):
 			for y in range(self.size):
 				if (self.agents[x, y].type != -1):
 					sat += self.get_satisfaction(x, y)
-					low_income_agent += 1
+					agent += 1
 					satisfactions += [self.get_satisfaction(x, y)]
 		self.satisfaction_distribution = satisfactions
-		return sat / low_income_agent
+		return sat / agent
 
+	# get average similarity
+	def get_average_similarity(self):
+		sim = 0
+		agent = 0
+		similarities = []
+		for x in range(self.size):
+			for y in range(self.size):
+				if (self.agents[x, y].type != -1):
+					sim += self.get_similarity(x, y)
+					agent += 1
+					similarities += [self.get_similarity(x, y)]
+		self.similarity_distribution = similarities
+		return sim / agent
+	
 	def get_satisfaction_distribution(self):
 		sat = []
 		for x in range(self.size):
@@ -315,6 +331,7 @@ class Model:
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="poor")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="wealthy")
+		ax[0, 3].plot(range(0, self.iterations), self.history_similarity, label="similarity")
 		ax[0, 3].legend()
 		ax[0, 3].set_box_aspect(1)
 
@@ -369,7 +386,7 @@ class Model:
 
 # example model
 model = Model(
-	size=100,
+	size=50,
 	iterations=100,
 	strategy_weights={
 		"random": 0.4,
@@ -381,10 +398,10 @@ model = Model(
 		0.5 # desirability
 	],
 	empty_ratio=0.2,
-	agent_types=5,
-	agent_ratios=[1/5]*5,
-	agent_thresholds=[0.3]*5,
-	agent_wealths=[16, 18, 19, 22, 24],
+	agent_types=3,
+	agent_ratios=[1/3]*3,
+	agent_thresholds=[0.3]*3,
+	agent_wealths=[16, 19, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
 	point_types=4,
@@ -395,11 +412,9 @@ model = Model(
 		Point(type=3, x=50, y=50)
 	],
 	agent_interests=[
-		[0.0, 0.0, 0.0, 1.0],
 		[0.3, 0.0, 0.0, 0.8],
 		[0.0, 0.3, 0.0, 0.8],
-		[0.0, 0.0, 0.3, 0.8],
-		[0.0, 0.0, 0.0, 1.0]
+		[0.0, 0.0, 0.3, 0.8]
 	]
 )
 
