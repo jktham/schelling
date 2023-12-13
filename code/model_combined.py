@@ -37,6 +37,7 @@ class Model:
 		self.price_distribution = None
 		self.satisfaction_distribution = None
 		self.moved = np.zeros(shape=(size, size))
+		self.similarity_distribution = None
 
 		self.history_satisfaction_expensive = [0]*iterations
 		self.history_satisfaction_cheap = [0]*iterations
@@ -50,6 +51,7 @@ class Model:
 		self.history_moved_count = [0]*iterations
 		self.history_satisfaction_grid = [np.zeros(shape=(size, size))]*iterations
 		self.history_similarity = [0]*iterations
+		self.history_satisfied_ratio = [0]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -233,6 +235,7 @@ class Model:
 			self.history_moved_count[i] = np.sum(self.moved)
 			self.history_satisfaction_grid[i] = self.get_satisfaction_grid()
 			self.history_similarity[i] = self.get_average_similarity()
+			self.history_satisfied_ratio[i] = self.get_satisfied_ratio()
 			
 			if i % 10 == 0:
 				print(f'iteration: {i}/{self.iterations}, time: {self.history_time[i]}s')
@@ -296,6 +299,18 @@ class Model:
 		self.similarity_distribution = similarities
 		return sim / agent
 	
+	# get ratio of satisfied agents
+	def get_satisfied_ratio(self):
+		sat_agents = 0
+		agents = 0
+		for x in range(self.size):
+			for y in range(self.size):
+				if (self.agents[x, y].type != -1):
+					if (not self.is_unsatisfied(x, y)):
+						sat_agents += 1
+					agents += 1
+		return sat_agents / agents
+	
 	def get_satisfaction_distribution(self):
 		sat = []
 		for x in range(self.size):
@@ -328,10 +343,11 @@ class Model:
 		ax[0, 2].set_box_aspect(1)
 
 		ax[0, 3].set_title(f'Avg. satisfaction over time')
-		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="all")
-		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="poor")
-		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="wealthy")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="satisfaction")
+		# ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="poor")
+		# ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="wealthy")
 		ax[0, 3].plot(range(0, self.iterations), self.history_similarity, label="similarity")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfied_ratio, label="satisfied ratio")
 		ax[0, 3].legend()
 		ax[0, 3].set_box_aspect(1)
 
