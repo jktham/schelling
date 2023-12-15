@@ -222,6 +222,7 @@ class Model:
 	# run model for configured number of iterations
 	def run(self):
 		t0 = time.time()
+		self.update_price()
 		for i in range(self.iterations):
 			self.history_satisfaction_expensive[i] = self.get_average_satisfaction_expensive()
 			self.history_satisfaction_cheap[i] = self.get_average_satisfaction_cheap()
@@ -342,11 +343,11 @@ class Model:
 		ax[0, 2].plot(range(0, self.iterations), self.history_moved_count)
 		ax[0, 2].set_box_aspect(1)
 
-		ax[0, 3].set_title(f'Avg. satisfaction over time')
-		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="satisfaction")
-		# ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="poor")
-		# ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="wealthy")
-		ax[0, 3].plot(range(0, self.iterations), self.history_similarity, label="similarity")
+		ax[0, 3].set_title(f'Satisfaction over time')
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction, label="avg. satisfaction")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_cheap, label="avg. sat cheap")
+		ax[0, 3].plot(range(0, self.iterations), self.history_satisfaction_expensive, label="avg. sat expensive")
+		ax[0, 3].plot(range(0, self.iterations), self.history_similarity, label="avg. similarity")
 		ax[0, 3].plot(range(0, self.iterations), self.history_satisfied_ratio, label="satisfied ratio")
 		ax[0, 3].legend()
 		ax[0, 3].set_box_aspect(1)
@@ -402,7 +403,7 @@ class Model:
 
 # example model
 model = Model(
-	size=50,
+	size=100,
 	iterations=100,
 	strategy_weights={
 		"random": 0.4,
@@ -414,10 +415,10 @@ model = Model(
 		0.5 # desirability
 	],
 	empty_ratio=0.2,
-	agent_types=3,
-	agent_ratios=[1/3]*3,
-	agent_thresholds=[0.3]*3,
-	agent_wealths=[16, 19, 24],
+	agent_types=5,
+	agent_ratios=[1/5]*5,
+	agent_thresholds=[0.3]*5,
+	agent_wealths=[16, 18, 19, 22, 24],
 	cell_types=4,
 	cell_ratios=[0.4, 0.3, 0.2, 0.1],
 	point_types=4,
@@ -428,9 +429,11 @@ model = Model(
 		Point(type=3, x=50, y=50)
 	],
 	agent_interests=[
+		[0.0, 0.0, 0.0, 1.0],
 		[0.3, 0.0, 0.0, 0.8],
 		[0.0, 0.3, 0.0, 0.8],
-		[0.0, 0.0, 0.3, 0.8]
+		[0.0, 0.0, 0.3, 0.8],
+		[0.0, 0.0, 0.0, 1.0]
 	]
 )
 
