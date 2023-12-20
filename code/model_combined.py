@@ -3,19 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import random
-import math
 import time
 import copy
 
 class Agent:
 	"""
-        Represents an agent in the simulation.
+	Represents an agent in the simulation.
 
-        Parameters:
-        - type (int): The type or category of the agent.
-        - threshold (float): The satisfaction threshold of the agent.
-        - wealth (float): The wealth level of the agent.
-        - interests (list): The agent's interest for points of interest in the grid.
+	Parameters:
+	- type (int): The type or category of the agent.
+	- threshold (float): The satisfaction threshold of the agent.
+	- wealth (float): The wealth level of the agent.
+	- interests (list): The agent's interest for points of interest in the grid.
 	"""
 	def __init__(self, type, threshold, wealth, interests):
 		self.type = type
@@ -28,16 +27,23 @@ class Cell:
     Represents a cell in the environment.
 
 	Parameters:
-	- type (int): The type or category of the cell.
+	- type (int): The type or category of the cell. (unused)
 	- price (float): The price associated with the cell.
 	- distances (numpy.ndarray): An array storing distances to each point type for this cell.
 	"""
 	def __init__(self, type, price, distances):
-		self.type = type
+		self.type = type # unused
 		self.price = 0
 		self.distances = distances
 
 class Point:
+	"""
+    Represents a point of interest.
+
+	Parameters:
+	- type (int): The type of the point.
+	- x, y (int): The location of the point. Randomized by model.setup() if None.
+	"""
 	def __init__(self, type, x, y):
 		self.type = type
 		self.x = x
@@ -51,24 +57,6 @@ class Model:
 		self.strategy_weights = strategy_weights
 		self.satisfaction_weights = satisfaction_weights
 		self.empty_ratio = empty_ratio
-		self.price_distribution = None
-		self.satisfaction_distribution = None
-		self.moved = np.zeros(shape=(size, size))
-		self.similarity_distribution = None
-
-		self.history_satisfaction_expensive = [0]*iterations
-		self.history_satisfaction_cheap = [0]*iterations
-		self.history_satisfaction = [0]*iterations
-		self.history_time = [0]*iterations
-		self.history_agents = [np.empty(shape=(size, size), dtype=object)]*iterations
-		self.history_cells = [np.empty(shape=(size, size), dtype=object)]*iterations
-		self.history_price_distribution = [None]*iterations
-		self.history_satisfaction_distribution = [None]*iterations
-		self.history_moved = [np.zeros(shape=(size, size))]*iterations
-		self.history_moved_count = [0]*iterations
-		self.history_satisfaction_grid = [np.zeros(shape=(size, size))]*iterations
-		self.history_similarity = [0]*iterations
-		self.history_satisfied_ratio = [0]*iterations
 
 		self.agents = np.empty(shape=(size, size), dtype=object)
 		self.agent_types = agent_types
@@ -84,6 +72,24 @@ class Model:
 		self.points = points
 		self.point_types = point_types
 
+		self.history_satisfaction_expensive = [0]*iterations
+		self.history_satisfaction_cheap = [0]*iterations
+		self.history_satisfaction = [0]*iterations
+		self.history_time = [0]*iterations
+		self.history_agents = [np.empty(shape=(size, size), dtype=object)]*iterations
+		self.history_cells = [np.empty(shape=(size, size), dtype=object)]*iterations
+		self.history_price_distribution = [None]*iterations
+		self.history_satisfaction_distribution = [None]*iterations
+		self.history_moved = [np.zeros(shape=(size, size))]*iterations
+		self.history_moved_count = [0]*iterations
+		self.history_satisfaction_grid = [np.zeros(shape=(size, size))]*iterations
+		self.history_similarity = [0]*iterations
+		self.history_satisfied_ratio = [0]*iterations
+		self.price_distribution = None
+		self.satisfaction_distribution = None
+		self.similarity_distribution = None
+		self.moved = np.zeros(shape=(size, size))
+
 	# fill agent grid according to types and ratios
 	def generate_agents(self):
 		"""
@@ -98,7 +104,7 @@ class Model:
 		self.agents.fill(None)
 		for x in range(self.size):
 			for y in range(self.size):
-				if random.random() < self.empty_ratio:
+				if random.random() < self.empty_ratio: # empty
 					self.agents[x, y] = Agent(
 						type=-1,
 						threshold=0,
@@ -126,7 +132,7 @@ class Model:
 					distances=np.empty(shape=(self.point_types))
 				)
 
-	# add one point of interest for each type at random locations and update cell distances
+	# add points of interest, update cell distances
 	def generate_points(self):
 		for p in self.points:
 			if p.x == None:
@@ -269,6 +275,7 @@ class Model:
 
 			self.iterate()
 
+	# get satisfaction values of entire grid
 	def get_satisfaction_grid(self):
 		satisfaction_grid = np.zeros(shape=(self.size, self.size))
 		for x in range(self.size):
@@ -276,7 +283,7 @@ class Model:
 				satisfaction_grid[x, y] = self.get_satisfaction(x, y)
 		return satisfaction_grid
 
-	# get average satisfaction of all agents
+	# get average satisfaction of all agents on expensive cells
 	def get_average_satisfaction_expensive(self):
 		sat = 0
 		high_income_agent = 1
@@ -287,7 +294,7 @@ class Model:
 					high_income_agent += 1
 		return sat / high_income_agent
 	
-	# get average satisfaction of all agents
+	# get average satisfaction of all agents on cheap cells
 	def get_average_satisfaction_cheap(self):
 		sat = 0
 		low_income_agent = 1
@@ -338,6 +345,7 @@ class Model:
 					agents += 1
 		return sat_agents / agents
 	
+	# get satisfaction distribution
 	def get_satisfaction_distribution(self):
 		sat = []
 		for x in range(self.size):
@@ -346,6 +354,7 @@ class Model:
 					sat.append(self.get_satisfaction(x, y))
 		return sat
 
+	# get price distribution
 	def get_price_distribution(self):
 		price = []
 		for x in range(self.size):
@@ -353,7 +362,7 @@ class Model:
 				price.append(self.cells[x,y].price)
 		return price
 	
-	# display current state of model using matplotlib
+	# display current state of model and history values using matplotlib
 	def display(self):
 		fig, ax = plt.subplots(2, 5, figsize=(16, 8))
 		fig.tight_layout(rect=[0, 0.02, 1, 0.92])
@@ -425,7 +434,7 @@ class Model:
 		# fig.savefig(f'plots/plot_{str(i).zfill(3)}.png', dpi=144)
 		anim.save(f'plots/plot_{str(i).zfill(3)}.gif', dpi=144, fps=20, writer="pillow")
 
-		# plt.show()
+		plt.show()
 
 # example model
 model = Model(
