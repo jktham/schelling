@@ -8,6 +8,15 @@ import time
 import copy
 
 class Agent:
+	"""
+        Represents an agent in the simulation.
+
+        Parameters:
+        - type (int): The type or category of the agent.
+        - threshold (float): The satisfaction threshold of the agent.
+        - wealth (float): The wealth level of the agent.
+        - interests (list): The agent's interest for points of interest in the grid.
+	"""
 	def __init__(self, type, threshold, wealth, interests):
 		self.type = type
 		self.threshold = threshold
@@ -15,6 +24,14 @@ class Agent:
 		self.interests = interests
 
 class Cell:
+	"""
+    Represents a cell in the environment.
+
+	Parameters:
+	- type (int): The type or category of the cell.
+	- price (float): The price associated with the cell.
+	- distances (numpy.ndarray): An array storing distances to each point type for this cell.
+	"""
 	def __init__(self, type, price, distances):
 		self.type = type
 		self.price = 0
@@ -69,6 +86,15 @@ class Model:
 
 	# fill agent grid according to types and ratios
 	def generate_agents(self):
+		"""
+		Fill the agent grid with randomly generated agents based on specified parameters.
+
+		The method populates the grid with agents, considering the empty ratio and randomly assigning agent types.
+
+		- For empty locations (determined by the empty ratio), create empty agents.
+		- For non-empty locations, randomly assign agent types based on given ratios.
+
+		"""
 		self.agents.fill(None)
 		for x in range(self.size):
 			for y in range(self.size):
